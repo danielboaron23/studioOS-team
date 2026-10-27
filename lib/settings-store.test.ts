@@ -10,7 +10,26 @@ import {
 
 describe("settings-store", () => {
   beforeEach(() => {
-    localStorage.clear()
+    // Stub localStorage
+    const store: Record<string, string> = {}
+    global.localStorage = {
+      getItem: vi.fn((key: string) => store[key] || null),
+      setItem: vi.fn((key: string, value: string) => {
+        store[key] = value
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete store[key]
+      }),
+      clear: vi.fn(() => {
+        Object.keys(store).forEach((key) => delete store[key])
+      }),
+      key: vi.fn(),
+      length: 0,
+    }
+
+    // Stub window for SSR check
+    global.window = {} as typeof globalThis.window
+
     vi.clearAllMocks()
   })
 

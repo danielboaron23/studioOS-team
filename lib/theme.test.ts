@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { setTheme, useTheme } from "./theme"
+import { setTheme } from "./theme"
 
+// In-test stubs for browser APIs
 const createMatchMediaMock = (matches: boolean) => ({
   matches,
   media: "(prefers-color-scheme: dark)",
@@ -13,8 +14,55 @@ const createMatchMediaMock = (matches: boolean) => ({
 
 describe("theme", () => {
   beforeEach(() => {
-    localStorage.clear()
-    document.documentElement.classList.remove("dark")
+    // Stub localStorage
+    const store: Record<string, string> = {}
+    global.localStorage = {
+      getItem: vi.fn((key: string) => store[key] || null),
+      setItem: vi.fn((key: string, value: string) => {
+        store[key] = value
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete store[key]
+      }),
+      clear: vi.fn(() => {
+        Object.keys(store).forEach((key) => delete store[key])
+      }),
+      key: vi.fn(),
+      length: 0,
+    }
+
+    // Stub document.documentElement.classList
+    const classList = new Set<string>()
+    global.document = {
+      documentElement: {
+        classList: {
+          add: vi.fn((cls: string) => classList.add(cls)),
+          remove: vi.fn((cls: string) => classList.delete(cls)),
+          toggle: vi.fn((cls: string, force?: boolean) => {
+            if (force === undefined) {
+              if (classList.has(cls)) {
+                classList.delete(cls)
+                return false
+              } else {
+                classList.add(cls)
+                return true
+              }
+            } else if (force) {
+              classList.add(cls)
+            } else {
+              classList.delete(cls)
+            }
+          }),
+          contains: vi.fn((cls: string) => classList.has(cls)),
+        },
+      },
+    } as typeof globalThis.document
+
+    // Stub matchMedia
+    global.window = {
+      matchMedia: vi.fn(() => createMatchMediaMock(false)),
+    } as typeof globalThis.window
+
     vi.clearAllMocks()
   })
 
@@ -34,10 +82,9 @@ describe("theme", () => {
     })
 
     it("should resolve system theme based on prefers-color-scheme", () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation(() => createMatchMediaMock(true)),
-      })
+      global.window = {
+        matchMedia: vi.fn(() => createMatchMediaMock(true)),
+      } as typeof globalThis.window
       
       setTheme("system")
       
@@ -46,10 +93,9 @@ describe("theme", () => {
     })
 
     it("should resolve system theme to light when prefers light", () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation(() => createMatchMediaMock(false)),
-      })
+      global.window = {
+        matchMedia: vi.fn(() => createMatchMediaMock(false)),
+      } as typeof globalThis.window
       
       setTheme("system")
       
@@ -81,10 +127,9 @@ describe("theme", () => {
     })
 
     it("should resolve system theme based on prefers-color-scheme", () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation(() => createMatchMediaMock(true)),
-      })
+      global.window = {
+        matchMedia: vi.fn(() => createMatchMediaMock(true)),
+      } as typeof globalThis.window
       
       setTheme("system")
       
