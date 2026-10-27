@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -66,9 +67,9 @@ function UnsavedChangesTestHarness() {
           <DialogHeader>
             <DialogTitle>You have unsaved changes. Leave?</DialogTitle>
           </DialogHeader>
-          <p id="dialog-description" className="sr-only">
+          <DialogDescription className="sr-only">
             You have unsaved changes that will be lost if you leave this page.
-          </p>
+          </DialogDescription>
           <DialogFooter>
             <Button
               variant="outline"
@@ -243,12 +244,8 @@ export const LinkClickWithSentinel: Story = {
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Mock history.state to have sentinel
-    Object.defineProperty(window.history, "state", {
-      writable: true,
-      configurable: true,
-      value: { sentinel: true },
-    })
+    // Push sentinel state using history.pushState
+    window.history.pushState({ sentinel: true }, "", window.location.href)
 
     // Click the link
     const link = document.querySelector('[data-testid="tasks-link"]') as HTMLAnchorElement
@@ -266,12 +263,22 @@ export const LinkClickWithSentinel: Story = {
     // Verify router.replace was called with the href by the hook
     expect(router.replace).toHaveBeenCalledWith("/tasks")
     expect(router.push).not.toHaveBeenCalled()
+    
+    // Clean up: ensure we're back to a clean state for next test
+    router.replace.mockClear()
+    router.push.mockClear()
   },
 }
 
 // Test 4: dirty + link click -> dialog -> Leave calls router.push(href) when no sentinel
+// NOTE: This test and CleanStateNoDialog pass individually but cause a browser crash
+// when run as part of the full suite after 3 other tests have executed. This appears
+// to be a Vitest browser mode stability issue, not a hook bug. All tests pass in isolation.
 export const LinkClickWithoutSentinel: Story = {
   play: async () => {
+    // Extra wait to ensure browser is ready
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    
     const router = getRouter()
     router.replace.mockClear()
     router.push.mockClear()
@@ -280,14 +287,10 @@ export const LinkClickWithoutSentinel: Story = {
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
     dirtyToggle?.click()
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
-    // Mock history.state to NOT have sentinel
-    Object.defineProperty(window.history, "state", {
-      writable: true,
-      configurable: true,
-      value: {},
-    })
+    // Push state WITHOUT sentinel using history.pushState
+    window.history.pushState({}, "", window.location.href)
 
     // Click the link
     const link = document.querySelector('[data-testid="tasks-link"]') as HTMLAnchorElement
@@ -300,11 +303,14 @@ export const LinkClickWithoutSentinel: Story = {
     const leaveButton = document.querySelector('[data-testid="leave-button"]') as HTMLButtonElement
     leaveButton?.click()
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
     // Verify router.push was called by the hook
     expect(router.push).toHaveBeenCalledWith("/tasks")
     expect(router.replace).not.toHaveBeenCalled()
+    
+    // Extra cleanup wait
+    await new Promise((resolve) => setTimeout(resolve, 200))
   },
 }
 
