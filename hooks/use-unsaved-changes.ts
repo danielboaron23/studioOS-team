@@ -18,6 +18,15 @@ export function useUnsavedChanges({
   const router = useRouter()
   const sentinelPushedRef = useRef(false)
   const leavingRef = useRef(false)
+  const skipSentinelCleanupRef = useRef(false)
+  const pendingHrefRef = useRef<string | null>(null)
+
+  // Reset flags when pathname changes (navigation completed)
+  useEffect(() => {
+    leavingRef.current = false
+    skipSentinelCleanupRef.current = false
+    pendingHrefRef.current = null
+  }, [pathname])
 
   // Reset leaving flag when form becomes clean
   useEffect(() => {
@@ -31,7 +40,8 @@ export function useUnsavedChanges({
     if (isDirty && !sentinelPushedRef.current && !leavingRef.current) {
       history.pushState({ sentinel: true, page: pathname }, "", window.location.href)
       sentinelPushedRef.current = true
-    } else if (!isDirty && sentinelPushedRef.current && !leavingRef.current) {
+    } else if (!isDirty && sentinelPushedRef.current && !leavingRef.current && !skipSentinelCleanupRef.current) {
+      // Only clean up sentinel if we're not in the middle of an intentional navigation
       if (history.state?.sentinel) {
         history.back()
       }
@@ -56,7 +66,6 @@ export function useUnsavedChanges({
       }
 
       // Back was pressed while dirty and sentinel was on top
-      // Sentinel has been popped, but Next hasn't changed the route yet
       if (sentinelPushedRef.current) {
         // Temporarily mark as not having sentinel
         sentinelPushedRef.current = false
@@ -66,6 +75,7 @@ export function useUnsavedChanges({
         if (shouldLeave) {
           // User wants to leave - navigate back to the previous page
           leavingRef.current = true
+          skipSentinelCleanupRef.current = true
           router.back()
         } else {
           // User wants to keep editing - push sentinel again
@@ -116,19 +126,30 @@ export function useUnsavedChanges({
       e.preventDefault()
       e.stopPropagation()
 
+      // Store the pending href
+      pendingHrefRef.current = href
+
       const shouldLeave = await handleLeave()
       
       if (shouldLeave) {
-        // Set leaving flag and navigate
+        // Set flags to prevent sentinel cleanup from interfering
         leavingRef.current = true
+        skipSentinelCleanupRef.current = true
         sentinelPushedRef.current = false
         
-        // If sentinel is on top, replace it; otherwise just navigate
-        if (history.state?.sentinel) {
-          router.replace(href)
-        } else {
-          router.push(href)
+        // Navigate using the pending href
+        const targetHref = pendingHrefRef.current
+        if (targetHref) {
+          // If sentinel is on top, replace it; otherwise just navigate
+          if (history.state?.sentinel) {
+            router.replace(targetHref)
+          } else {
+            router.push(targetHref)
+          }
         }
+      } else {
+        // User cancelled - clear pending href
+        pendingHrefRef.current = null
       }
     }
 

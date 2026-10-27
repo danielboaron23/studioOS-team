@@ -74,9 +74,7 @@ export default function ProfilePage() {
         setShowUnsavedDialog(true)
         const handleDialog = (discard: boolean) => {
           setShowUnsavedDialog(false)
-          if (discard) {
-            handleDiscard()
-          }
+          // Don't call handleDiscard here - let navigation proceed and page unmount
           resolve(discard)
         }
         ;(window as unknown as { __unsavedDialogHandler?: (discard: boolean) => void }).__unsavedDialogHandler = handleDialog
@@ -357,7 +355,6 @@ export default function ProfilePage() {
               onClick={() => {
                 const handler = (window as unknown as { __unsavedDialogHandler?: (discard: boolean) => void }).__unsavedDialogHandler
                 handler?.(true)
-                handleDiscard()
                 setShowUnsavedDialog(false)
               }}
             >
