@@ -2,33 +2,34 @@
 
 import { useState } from "react"
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import { expect, vi } from "vitest"
-import { useUnsavedChanges } from "./use-unsaved-changes"
+import { expect, fn } from "storybook/test"
+import { getRouter } from "@storybook/nextjs-vite/navigation.mock"
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // Test harness component
-function UnsavedChangesTestHarness({
-  onRouterBack,
-  onRouterReplace,
-  onRouterPush,
-}: {
-  onRouterBack?: () => void
-  onRouterReplace?: (href: string) => void
-  onRouterPush?: (href: string) => void
-}) {
+function UnsavedChangesTestHarness() {
   const [isDirty, setIsDirty] = useState(false)
   const [showDialog, setShowDialog] = useState(false)
-  const [pendingAction, setPendingAction] = useState<"leave" | "stay" | null>(null)
 
   useUnsavedChanges({
     isDirty,
     onNavigateAway: () => {
       return new Promise<boolean>((resolve) => {
         setShowDialog(true)
-        // Store resolver on window for test access
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(window as any).__testDialogResolve = (leave: boolean) => {
+        // Store resolver for test access
+        interface WindowWithTest extends Window {
+          __testDialogResolve?: (leave: boolean) => void
+        }
+        ;(window as WindowWithTest).__testDialogResolve = (leave: boolean) => {
           setShowDialog(false)
-          setPendingAction(leave ? "leave" : "stay")
           resolve(leave)
         }
       })
@@ -36,77 +37,66 @@ function UnsavedChangesTestHarness({
   })
 
   return (
-    <div data-testid="harness">
+    <div data-testid="harness" className="p-6 space-y-4">
       <div>
-        <label>
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={isDirty}
             onChange={(e) => setIsDirty(e.target.checked)}
             data-testid="dirty-toggle"
+            className="size-4"
           />
-          Form is dirty
+          <span className="text-sm">Form is dirty</span>
         </label>
       </div>
 
-      <div style={{ marginTop: "1rem" }}>
-        <a href="/tasks" data-testid="tasks-link">
+      <div>
+        <a
+          href="/tasks"
+          data-testid="tasks-link"
+          className="text-primary underline-offset-4 hover:underline"
+        >
           Tasks
         </a>
       </div>
 
-      {showDialog && (
-        <div
-          role="dialog"
-          aria-label="Unsaved changes"
-          data-testid="dialog"
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            padding: "2rem",
-            background: "white",
-            border: "1px solid black",
-            zIndex: 1000,
-          }}
-        >
-          <p>You have unsaved changes. Leave?</p>
-          <button
-            onClick={() => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ;(window as any).__testDialogResolve?.(true)
-              if (onRouterReplace || onRouterPush) {
-                const href = "/tasks"
-                if (window.history.state?.sentinel && onRouterReplace) {
-                  onRouterReplace(href)
-                } else if (onRouterPush) {
-                  onRouterPush(href)
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent data-testid="dialog" aria-describedby="dialog-description">
+          <DialogHeader>
+            <DialogTitle>You have unsaved changes. Leave?</DialogTitle>
+          </DialogHeader>
+          <p id="dialog-description" className="sr-only">
+            You have unsaved changes that will be lost if you leave this page.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                interface WindowWithTest extends Window {
+                  __testDialogResolve?: (leave: boolean) => void
                 }
-              }
-            }}
-            data-testid="leave-button"
-          >
-            Leave
-          </button>
-          <button
-            onClick={() => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ;(window as any).__testDialogResolve?.(false)
-            }}
-            data-testid="stay-button"
-          >
-            Stay
-          </button>
-        </div>
-      )}
-
-      <div data-testid="router-calls" style={{ marginTop: "1rem", fontSize: "0.875rem" }}>
-        <div>Router back called: {onRouterBack ? "ready" : "none"}</div>
-        <div>Router replace called: {onRouterReplace ? "ready" : "none"}</div>
-        <div>Router push called: {onRouterPush ? "ready" : "none"}</div>
-        <div>Pending action: {pendingAction || "none"}</div>
-      </div>
+                ;(window as WindowWithTest).__testDialogResolve?.(false)
+              }}
+              data-testid="stay-button"
+            >
+              Stay
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                interface WindowWithTest extends Window {
+                  __testDialogResolve?: (leave: boolean) => void
+                }
+                ;(window as WindowWithTest).__testDialogResolve?.(true)
+              }}
+              data-testid="leave-button"
+            >
+              Leave
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -116,6 +106,12 @@ const meta: Meta<typeof UnsavedChangesTestHarness> = {
   component: UnsavedChangesTestHarness,
   parameters: {
     layout: "centered",
+    nextjs: {
+      appDirectory: true,
+      navigation: {
+        pathname: "/test-page",
+      },
+    },
     docs: {
       description: {
         component:
@@ -159,21 +155,16 @@ function waitForElement(selector: string, timeout = 3000): Promise<HTMLElement> 
 
 // Test 1: dirty + Back (popstate) -> dialog -> Leave calls router.back()
 export const BrowserBackLeave: Story = {
-  args: {
-    onRouterBack: vi.fn(),
-    onRouterReplace: vi.fn(),
-    onRouterPush: vi.fn(),
-  },
-  play: async ({ args }) => {
+  play: async () => {
+    const router = getRouter()
+    router.back.mockClear()
+
     // Make form dirty
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
     dirtyToggle?.click()
 
-    // Wait for state update
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Verify dirty
-    // eslint-disable-next-line storybook/use-storybook-expect
     expect(dirtyToggle?.checked).toBe(true)
 
     // Simulate browser back by dispatching popstate
@@ -184,29 +175,21 @@ export const BrowserBackLeave: Story = {
 
     // Wait for dialog to appear
     const dialog = await waitForElement('[data-testid="dialog"]')
-    // eslint-disable-next-line storybook/use-storybook-expect
     expect(dialog).toBeTruthy()
 
     // Click Leave
     const leaveButton = document.querySelector('[data-testid="leave-button"]') as HTMLButtonElement
     leaveButton?.click()
 
-    // Wait for handler
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Verify router.back() was called
-    // eslint-disable-next-line storybook/use-storybook-expect
-    expect(args.onRouterBack).toHaveBeenCalled()
+    // Verify router.back() was called by the hook
+    expect(router.back).toHaveBeenCalled()
   },
 }
 
 // Test 2: dirty + Back -> Keep editing re-pushes sentinel
 export const BrowserBackStay: Story = {
-  args: {
-    onRouterBack: vi.fn(),
-    onRouterReplace: vi.fn(),
-    onRouterPush: vi.fn(),
-  },
   play: async () => {
     // Make form dirty
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
@@ -215,12 +198,11 @@ export const BrowserBackStay: Story = {
     await new Promise((resolve) => setTimeout(resolve, 100))
 
     // Track history pushState calls
-    const pushStateSpy = vi.fn()
+    const pushStateSpy = fn()
     const originalPushState = window.history.pushState
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    window.history.pushState = pushStateSpy as any
+    window.history.pushState = pushStateSpy as unknown as typeof window.history.pushState
 
-    // Wait a bit for sentinel to be pushed
+    // Wait for sentinel to be pushed
     await new Promise((resolve) => setTimeout(resolve, 100))
     const initialPushCount = pushStateSpy.mock.calls.length
 
@@ -241,7 +223,6 @@ export const BrowserBackStay: Story = {
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     // Verify sentinel was re-pushed (pushState called again)
-    // eslint-disable-next-line storybook/use-storybook-expect
     expect(pushStateSpy.mock.calls.length).toBeGreaterThan(initialPushCount)
 
     // Restore
@@ -251,12 +232,11 @@ export const BrowserBackStay: Story = {
 
 // Test 3: dirty + link click -> dialog -> Leave calls router.replace(href) when sentinel on top
 export const LinkClickWithSentinel: Story = {
-  args: {
-    onRouterBack: vi.fn(),
-    onRouterReplace: vi.fn(),
-    onRouterPush: vi.fn(),
-  },
-  play: async ({ args }) => {
+  play: async () => {
+    const router = getRouter()
+    router.replace.mockClear()
+    router.push.mockClear()
+
     // Make form dirty
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
     dirtyToggle?.click()
@@ -283,22 +263,19 @@ export const LinkClickWithSentinel: Story = {
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Verify router.replace was called with the href
-    // eslint-disable-next-line storybook/use-storybook-expect
-    expect(args.onRouterReplace).toHaveBeenCalledWith("/tasks")
-    // eslint-disable-next-line storybook/use-storybook-expect
-    expect(args.onRouterPush).not.toHaveBeenCalled()
+    // Verify router.replace was called with the href by the hook
+    expect(router.replace).toHaveBeenCalledWith("/tasks")
+    expect(router.push).not.toHaveBeenCalled()
   },
 }
 
 // Test 4: dirty + link click -> dialog -> Leave calls router.push(href) when no sentinel
 export const LinkClickWithoutSentinel: Story = {
-  args: {
-    onRouterBack: vi.fn(),
-    onRouterReplace: vi.fn(),
-    onRouterPush: vi.fn(),
-  },
-  play: async ({ args }) => {
+  play: async () => {
+    const router = getRouter()
+    router.replace.mockClear()
+    router.push.mockClear()
+
     // Make form dirty
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
     dirtyToggle?.click()
@@ -325,25 +302,17 @@ export const LinkClickWithoutSentinel: Story = {
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // Verify router.push was called
-    // eslint-disable-next-line storybook/use-storybook-expect
-    expect(args.onRouterPush).toHaveBeenCalledWith("/tasks")
-    // eslint-disable-next-line storybook/use-storybook-expect
-    expect(args.onRouterReplace).not.toHaveBeenCalled()
+    // Verify router.push was called by the hook
+    expect(router.push).toHaveBeenCalledWith("/tasks")
+    expect(router.replace).not.toHaveBeenCalled()
   },
 }
 
 // Test 5: clean state -> link click does not show dialog
 export const CleanStateNoDialog: Story = {
-  args: {
-    onRouterBack: vi.fn(),
-    onRouterReplace: vi.fn(),
-    onRouterPush: vi.fn(),
-  },
   play: async () => {
     // Ensure form is clean (default state)
     const dirtyToggle = document.querySelector('[data-testid="dirty-toggle"]') as HTMLInputElement
-    // eslint-disable-next-line storybook/use-storybook-expect
     expect(dirtyToggle?.checked).toBe(false)
 
     // Click the link
@@ -355,16 +324,9 @@ export const CleanStateNoDialog: Story = {
 
     // Dialog should NOT appear
     const dialog = document.querySelector('[data-testid="dialog"]')
-    // eslint-disable-next-line storybook/use-storybook-expect
     expect(dialog).toBeFalsy()
   },
 }
 
 // Visual story without tests
-export const Interactive: Story = {
-  args: {
-    onRouterBack: () => console.log("router.back()"),
-    onRouterReplace: (href) => console.log("router.replace()", href),
-    onRouterPush: (href) => console.log("router.push()", href),
-  },
-}
+export const Interactive: Story = {}
