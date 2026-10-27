@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
 
 export interface FieldProps {
   label?: string
@@ -22,13 +23,10 @@ export function Field({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {label && (
-        <label
-          htmlFor={htmlFor}
-          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-        >
+        <Label htmlFor={htmlFor}>
           {label}
           {required && <span className="text-destructive ml-1">*</span>}
-        </label>
+        </Label>
       )}
       {children}
       {description && !error && (

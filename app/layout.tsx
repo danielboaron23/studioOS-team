@@ -5,6 +5,7 @@ import "./globals.css";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Studio OS",
@@ -50,6 +51,7 @@ export default function RootLayout({
             </div>
           </SidebarInset>
         </SidebarProvider>
+        <Toaster />
       </body>
     </html>
   );
