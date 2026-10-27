@@ -1,15 +1,5 @@
-"use client"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-import ProfilePage from "./profile/page"
+import { redirect } from "next/navigation"
 
 export default function SettingsPage() {
-  const router = useRouter()
-  
-  useEffect(() => {
-    router.replace("/settings/profile")
-  }, [router])
-  
-  return <ProfilePage />
+  redirect("/settings/profile")
 }

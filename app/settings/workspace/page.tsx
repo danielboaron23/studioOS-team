@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,15 @@ import {
   updateWorkspaceSettings,
   type WorkspaceMember,
 } from "@/lib/settings-store"
+import {
+  slugify,
+  validateLogoFile,
+  validateLogoSquare,
+  validateEmail,
+  validateInviteChips,
+  formatInviteErrors,
+  type InviteChip,
+} from "@/lib/settings-validation"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -43,18 +53,6 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-}
-
 export default function WorkspacePage() {
   const savedWorkspace = useWorkspaceSettings()
   const [isLoading, setIsLoading] = useState(true)
@@ -65,10 +63,12 @@ export default function WorkspacePage() {
   const [logoError, setLogoError] = useState("")
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [inviteInput, setInviteInput] = useState("")
-  const [inviteChips, setInviteChips] = useState<{ email: string; error?: string }[]>([])
-  const [inviteError, setInviteError] = useState("")
+  const [inviteChips, setInviteChips] = useState<InviteChip[]>([])
   const [memberToRemove, setMemberToRemove] = useState<WorkspaceMember | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Derive inviteError directly from inviteChips
+  const inviteError = formatInviteErrors(inviteChips)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,13 +132,9 @@ export default function WorkspacePage() {
 
     setLogoError("")
 
-    if (!["image/png", "image/svg+xml"].includes(file.type)) {
-      setLogoError("PNG or SVG, up to 1 MB, square.")
-      return
-    }
-
-    if (file.size > 1024 * 1024) {
-      setLogoError("PNG or SVG, up to 1 MB, square.")
+    const fileError = validateLogoFile(file)
+    if (fileError) {
+      setLogoError(fileError)
       return
     }
 
@@ -146,8 +142,9 @@ export default function WorkspacePage() {
     reader.onloadend = () => {
       const img = new Image()
       img.onload = () => {
-        if (img.width !== img.height) {
-          setLogoError("Logo must be square (1:1).")
+        const squareError = validateLogoSquare(img.width, img.height)
+        if (squareError) {
+          setLogoError(squareError)
         } else {
           setLogoDataUrl(reader.result as string)
         }
@@ -178,18 +175,24 @@ export default function WorkspacePage() {
   }
 
   const addInviteChip = (email: string) => {
-    const existingMember = members.find((m) => m.email === email)
-    if (existingMember) {
-      setInviteChips([...inviteChips, { email, error: "Already in workspace" }])
-      return
-    }
+    const existingEmails = members.map((m) => m.email)
+    const validated = validateInviteChips([email], existingEmails)[0]
 
-    if (!validateEmail(email)) {
-      setInviteChips([...inviteChips, { email, error: "Invalid email" }])
-      return
+    if (validated.error === "already-member") {
+      setInviteChips([...inviteChips, { email, error: "already-member" }])
+    } else if (validated.error === "invalid") {
+      setInviteChips([...inviteChips, { email, error: "invalid" }])
+    } else {
+      // Check for duplicates in current chips
+      const isDuplicate = inviteChips.some(
+        (c) => c.email.toLowerCase() === email.toLowerCase()
+      )
+      if (isDuplicate) {
+        setInviteChips([...inviteChips, { email, error: "duplicate" }])
+      } else {
+        setInviteChips([...inviteChips, { email }])
+      }
     }
-
-    setInviteChips([...inviteChips, { email }])
   }
 
   const removeInviteChip = (index: number) => {
@@ -225,18 +228,6 @@ export default function WorkspacePage() {
   const hasInviteErrors = inviteChips.some((c) => c.error)
   const canInvite = inviteChips.length > 0 && !hasInviteErrors
 
-  useEffect(() => {
-    const errors: string[] = []
-    inviteChips.forEach((chip) => {
-      if (chip.error === "Already in workspace") {
-        errors.push(`Already in workspace: ${chip.email}`)
-      } else if (chip.error === "Invalid email") {
-        errors.push(`Check: ${chip.email}`)
-      }
-    })
-    setInviteError(errors.join(". "))
-  }, [inviteChips])
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -256,7 +247,6 @@ export default function WorkspacePage() {
   }
 
   const owner = members.find((m) => m.role === "Owner (you)")
-  const otherMembers = members.filter((m) => m.role !== "Owner (you)")
   const isEmpty = members.length === 1 && owner
 
   return (
@@ -434,9 +424,7 @@ export default function WorkspacePage() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{member.role}</span>
                             {member.status === "Invited" && (
-                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                Invited
-                              </span>
+                              <Badge variant="secondary">Invited</Badge>
                             )}
                           </div>
                         </td>

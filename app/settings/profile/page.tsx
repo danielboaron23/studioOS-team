@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 import { Field } from "@/components/settings/field"
 import { SaveBar } from "@/components/settings/save-bar"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useProfileSettings, updateProfileSettings } from "@/lib/settings-store"
+import { validateProfile, validateAvatarFile } from "@/lib/settings-validation"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -30,23 +32,6 @@ function getInitials(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase()
-}
-
-function validateProfile(data: {
-  displayName: string
-  bio: string
-}) {
-  const errors: { displayName?: string; bio?: string } = {}
-
-  if (data.displayName.length < 2 || data.displayName.length > 60) {
-    errors.displayName = "Display name must be 2–60 characters."
-  }
-
-  if (data.bio.length > 280) {
-    errors.bio = `Bio must be 280 characters or less.`
-  }
-
-  return errors
 }
 
 export default function ProfilePage() {
@@ -151,15 +136,9 @@ export default function ProfilePage() {
 
     setAvatarError("")
 
-    // Validate file type
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setAvatarError("Use a PNG, JPG or WebP file up to 2 MB.")
-      return
-    }
-
-    // Validate file size (2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError("Use a PNG, JPG or WebP file up to 2 MB.")
+    const error = validateAvatarFile(file)
+    if (error) {
+      setAvatarError(error)
       return
     }
 
@@ -305,9 +284,9 @@ export default function ProfilePage() {
             label={
               <span>
                 Email
-                <span className="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Badge variant="secondary" className="ml-2">
                   Verified
-                </span>
+                </Badge>
               </span>
             }
             htmlFor="email"

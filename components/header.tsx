@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Moon, Sun, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,9 +23,10 @@ function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
   const { theme, resolvedTheme } = useTheme()
 
-  if (typeof window !== "undefined" && !mounted) {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
-  }
+  }, [])
 
   function toggle() {
     const next = theme === "system" 
