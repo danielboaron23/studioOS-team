@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Moon, Sun, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-
-const userName = "Hani Buskila"
+import { useTheme, setTheme as setGlobalTheme } from "@/lib/theme"
+import { useProfileSettings } from "@/lib/settings-store"
 
 function getInitials(name: string) {
   return name
@@ -21,25 +21,17 @@ function getInitials(name: string) {
 
 function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const { theme, resolvedTheme } = useTheme()
 
-  useEffect(() => {
-    const stored = localStorage.getItem("theme")
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    const initial = stored === "dark" || (!stored && prefersDark) ? "dark" : "light"
-    // localStorage/matchMedia are unavailable during SSR, so the real theme can
-    // only be read after mount; the mounted-guard avoids a hydration mismatch.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTheme(initial)
-    document.documentElement.classList.toggle("dark", initial === "dark")
+  if (typeof window !== "undefined" && !mounted) {
     setMounted(true)
-  }, [])
+  }
 
   function toggle() {
-    const next = theme === "light" ? "dark" : "light"
-    setTheme(next)
-    localStorage.setItem("theme", next)
-    document.documentElement.classList.toggle("dark", next === "dark")
+    const next = theme === "system" 
+      ? (resolvedTheme === "light" ? "dark" : "light")
+      : (theme === "light" ? "dark" : "light")
+    setGlobalTheme(next)
   }
 
   if (!mounted) {
@@ -53,13 +45,15 @@ function ThemeToggle() {
 
   return (
     <Button variant="ghost" size="icon" onClick={toggle}>
-      {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
+      {resolvedTheme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
       <span className="sr-only">Toggle theme</span>
     </Button>
   )
 }
 
 export function Header() {
+  const profile = useProfileSettings()
+  
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
@@ -75,12 +69,15 @@ export function Header() {
 
       <div className="flex items-center gap-2">
         <div className="hidden sm:flex flex-col items-end leading-tight">
-          <span className="text-sm font-medium">{userName}</span>
-          <span className="text-xs text-muted-foreground">Product Designer</span>
+          <span className="text-sm font-medium">{profile.displayName}</span>
+          <span className="text-xs text-muted-foreground">{profile.role}</span>
         </div>
         <Avatar size="sm">
-          <AvatarFallback className="bg-[#3b82f5] text-white font-bold">
-            {getInitials(userName)}
+          {profile.avatarDataUrl && (
+            <AvatarImage src={profile.avatarDataUrl} alt={profile.displayName} />
+          )}
+          <AvatarFallback className="bg-muted text-foreground font-bold">
+            {getInitials(profile.displayName)}
           </AvatarFallback>
         </Avatar>
       </div>
