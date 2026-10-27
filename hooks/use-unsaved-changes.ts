@@ -17,25 +17,53 @@ export function useUnsavedChanges({
   const pathname = usePathname()
   const router = useRouter()
   const pendingNavigationRef = useRef<string | null>(null)
+  const sentinelPushedRef = useRef(false)
+  const isHandlingPopStateRef = useRef(false)
+
+  // Push sentinel when becoming dirty, remove when clean
+  useEffect(() => {
+    if (isDirty && !sentinelPushedRef.current) {
+      // Push sentinel history entry to intercept Back
+      history.pushState({ sentinel: true }, "", window.location.href)
+      sentinelPushedRef.current = true
+    } else if (!isDirty && sentinelPushedRef.current) {
+      // Clean up sentinel when form becomes clean
+      if (history.state?.sentinel) {
+        history.back()
+      }
+      sentinelPushedRef.current = false
+    }
+  }, [isDirty])
 
   useEffect(() => {
     // Handle browser back/forward
-    const handlePopState = () => {
-      if (!isDirty) return
+    const handlePopState = (e: PopStateEvent) => {
+      if (!isDirty) {
+        sentinelPushedRef.current = false
+        return
+      }
 
-      // Push state back to block navigation
-      history.pushState(null, "", window.location.href)
+      // Prevent infinite loop
+      if (isHandlingPopStateRef.current) return
+      isHandlingPopStateRef.current = true
+
+      // Re-push sentinel to stay on current page
+      history.pushState({ sentinel: true }, "", window.location.href)
 
       if (onNavigateAway) {
         onNavigateAway().then((shouldNavigate) => {
+          isHandlingPopStateRef.current = false
           if (shouldNavigate) {
-            // Allow the navigation by going back
+            // Clean up and navigate back
+            sentinelPushedRef.current = false
             history.back()
           }
         })
       } else {
         const shouldNavigate = window.confirm(message)
+        isHandlingPopStateRef.current = false
         if (shouldNavigate) {
+          sentinelPushedRef.current = false
           history.back()
         }
       }
@@ -89,8 +117,21 @@ export function useUnsavedChanges({
       if (onNavigateAway) {
         onNavigateAway().then((shouldNavigate) => {
           if (shouldNavigate && pendingNavigationRef.current) {
-            router.push(pendingNavigationRef.current)
-            pendingNavigationRef.current = null
+            // Clean up sentinel before navigating
+            if (sentinelPushedRef.current && history.state?.sentinel) {
+              history.back()
+              sentinelPushedRef.current = false
+              // Wait for back to complete before pushing new route
+              setTimeout(() => {
+                if (pendingNavigationRef.current) {
+                  router.push(pendingNavigationRef.current)
+                  pendingNavigationRef.current = null
+                }
+              }, 0)
+            } else {
+              router.push(pendingNavigationRef.current)
+              pendingNavigationRef.current = null
+            }
           } else {
             pendingNavigationRef.current = null
           }
@@ -98,8 +139,20 @@ export function useUnsavedChanges({
       } else {
         const shouldNavigate = window.confirm(message)
         if (shouldNavigate && pendingNavigationRef.current) {
-          router.push(pendingNavigationRef.current)
-          pendingNavigationRef.current = null
+          // Clean up sentinel before navigating
+          if (sentinelPushedRef.current && history.state?.sentinel) {
+            history.back()
+            sentinelPushedRef.current = false
+            setTimeout(() => {
+              if (pendingNavigationRef.current) {
+                router.push(pendingNavigationRef.current)
+                pendingNavigationRef.current = null
+              }
+            }, 0)
+          } else {
+            router.push(pendingNavigationRef.current)
+            pendingNavigationRef.current = null
+          }
         } else {
           pendingNavigationRef.current = null
         }

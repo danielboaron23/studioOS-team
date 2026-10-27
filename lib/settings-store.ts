@@ -183,7 +183,7 @@ export function useSettings() {
       return () => listeners.delete(listener)
     },
     () => store,
-    () => store
+    () => defaultSettings // Server snapshot always returns defaults
   )
 }
 

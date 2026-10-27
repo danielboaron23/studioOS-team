@@ -53,7 +53,13 @@ function ThemeToggle() {
 }
 
 export function Header() {
+  const [mounted, setMounted] = useState(false)
   const profile = useProfileSettings()
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
   
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
@@ -69,18 +75,31 @@ export function Header() {
       <ThemeToggle />
 
       <div className="flex items-center gap-2">
-        <div className="hidden sm:flex flex-col items-end leading-tight">
-          <span className="text-sm font-medium">{profile.displayName}</span>
-          <span className="text-xs text-muted-foreground">{profile.role}</span>
-        </div>
-        <Avatar size="sm">
-          {profile.avatarDataUrl && (
-            <AvatarImage src={profile.avatarDataUrl} alt={profile.displayName} />
-          )}
-          <AvatarFallback className="bg-muted text-foreground font-bold">
-            {getInitials(profile.displayName)}
-          </AvatarFallback>
-        </Avatar>
+        {mounted && (
+          <>
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-sm font-medium">{profile.displayName}</span>
+              <span className="text-xs text-muted-foreground">{profile.role}</span>
+            </div>
+            <Avatar size="sm">
+              {profile.avatarDataUrl && (
+                <AvatarImage src={profile.avatarDataUrl} alt={profile.displayName} />
+              )}
+              <AvatarFallback className="bg-muted text-foreground font-bold">
+                {getInitials(profile.displayName)}
+              </AvatarFallback>
+            </Avatar>
+          </>
+        )}
+        {!mounted && (
+          <>
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <div className="h-[1.25rem] w-24 bg-muted rounded animate-pulse" />
+              <div className="h-[1rem] w-32 bg-muted rounded animate-pulse mt-0.5" />
+            </div>
+            <div className="size-8 rounded-full bg-muted animate-pulse" />
+          </>
+        )}
       </div>
     </header>
   )
