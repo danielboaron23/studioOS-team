@@ -56,12 +56,12 @@ describe("theme", () => {
           contains: vi.fn((cls: string) => classList.has(cls)),
         },
       },
-    } as typeof globalThis.document
+    } as unknown as typeof globalThis.document
 
     // Stub matchMedia
     global.window = {
       matchMedia: vi.fn(() => createMatchMediaMock(false)),
-    } as typeof globalThis.window
+    } as unknown as typeof globalThis.window
 
     vi.clearAllMocks()
   })
@@ -84,7 +84,7 @@ describe("theme", () => {
     it("should resolve system theme based on prefers-color-scheme", () => {
       global.window = {
         matchMedia: vi.fn(() => createMatchMediaMock(true)),
-      } as typeof globalThis.window
+      } as unknown as typeof globalThis.window
       
       setTheme("system")
       
@@ -95,7 +95,7 @@ describe("theme", () => {
     it("should resolve system theme to light when prefers light", () => {
       global.window = {
         matchMedia: vi.fn(() => createMatchMediaMock(false)),
-      } as typeof globalThis.window
+      } as unknown as typeof globalThis.window
       
       setTheme("system")
       
@@ -129,7 +129,7 @@ describe("theme", () => {
     it("should resolve system theme based on prefers-color-scheme", () => {
       global.window = {
         matchMedia: vi.fn(() => createMatchMediaMock(true)),
-      } as typeof globalThis.window
+      } as unknown as typeof globalThis.window
       
       setTheme("system")
       

@@ -1,13 +1,15 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { Loader2 } from "lucide-react"
 
 export interface SaveBarProps {
   onSave: () => void
   onDiscard: () => void
+  disabled?: boolean
   className?: string
 }
 
-export function SaveBar({ onSave, onDiscard, className }: SaveBarProps) {
+export function SaveBar({ onSave, onDiscard, disabled, className }: SaveBarProps) {
   return (
     <div
       className={cn(
@@ -19,10 +21,13 @@ export function SaveBar({ onSave, onDiscard, className }: SaveBarProps) {
         You have unsaved changes
       </p>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={onDiscard}>
+        <Button variant="outline" onClick={onDiscard} disabled={disabled}>
           Discard
         </Button>
-        <Button onClick={onSave}>Save changes</Button>
+        <Button onClick={onSave} disabled={disabled}>
+          {disabled && <Loader2 className="size-4 animate-spin" />}
+          Save changes
+        </Button>
       </div>
     </div>
   )
