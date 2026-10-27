@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 export interface UseUnsavedChangesOptions {
@@ -16,53 +16,61 @@ export function useUnsavedChanges({
 }: UseUnsavedChangesOptions) {
   const pathname = usePathname()
   const router = useRouter()
-  const pendingNavigationRef = useRef<string | null>(null)
   const sentinelPushedRef = useRef(false)
   const leavingRef = useRef(false)
+
+  // Reset leaving flag when form becomes clean
+  useEffect(() => {
+    if (!isDirty) {
+      leavingRef.current = false
+    }
+  }, [isDirty])
 
   // Push sentinel when becoming dirty, remove when clean
   useEffect(() => {
     if (isDirty && !sentinelPushedRef.current && !leavingRef.current) {
-      // Push sentinel history entry to intercept Back
-      history.pushState({ sentinel: true }, "", window.location.href)
+      history.pushState({ sentinel: true, page: pathname }, "", window.location.href)
       sentinelPushedRef.current = true
     } else if (!isDirty && sentinelPushedRef.current && !leavingRef.current) {
-      // Clean up sentinel when form becomes clean
       if (history.state?.sentinel) {
         history.back()
       }
       sentinelPushedRef.current = false
     }
-  }, [isDirty])
+  }, [isDirty, pathname])
+
+  const handleLeave = useCallback(async () => {
+    if (onNavigateAway) {
+      return await onNavigateAway()
+    } else {
+      return window.confirm(message)
+    }
+  }, [message, onNavigateAway])
 
   useEffect(() => {
     // Handle browser back/forward
-    const handlePopState = () => {
-      // Skip if we're in the process of leaving
+    const handlePopState = async () => {
       if (leavingRef.current || !isDirty) {
         sentinelPushedRef.current = false
         return
       }
 
-      // Re-push sentinel to stay on current page
-      history.pushState({ sentinel: true }, "", window.location.href)
-
-      if (onNavigateAway) {
-        onNavigateAway().then((shouldNavigate) => {
-          if (shouldNavigate) {
-            // Set leaving flag and navigate back
-            leavingRef.current = true
-            sentinelPushedRef.current = false
-            // Go back 2 steps: the sentinel we just pushed + the real back step
-            history.go(-2)
-          }
-        })
-      } else {
-        const shouldNavigate = window.confirm(message)
-        if (shouldNavigate) {
+      // Back was pressed while dirty and sentinel was on top
+      // Sentinel has been popped, but Next hasn't changed the route yet
+      if (sentinelPushedRef.current) {
+        // Temporarily mark as not having sentinel
+        sentinelPushedRef.current = false
+        
+        const shouldLeave = await handleLeave()
+        
+        if (shouldLeave) {
+          // User wants to leave - navigate back to the previous page
           leavingRef.current = true
-          sentinelPushedRef.current = false
-          history.go(-2)
+          router.back()
+        } else {
+          // User wants to keep editing - push sentinel again
+          history.pushState({ sentinel: true, page: pathname }, "", window.location.href)
+          sentinelPushedRef.current = true
         }
       }
     }
@@ -76,7 +84,7 @@ export function useUnsavedChanges({
     }
 
     // Handle in-app navigation via links
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = async (e: MouseEvent) => {
       if (leavingRef.current || !isDirty) return
 
       const target = e.target as HTMLElement
@@ -84,7 +92,6 @@ export function useUnsavedChanges({
       
       if (!anchor) return
 
-      // Skip external links, modified clicks, and target="_blank"
       const href = anchor.getAttribute("href")
       if (
         !href ||
@@ -100,7 +107,6 @@ export function useUnsavedChanges({
         return
       }
 
-      // Check if this is a different route
       const url = new URL(href, window.location.origin)
       if (url.pathname === pathname) {
         return
@@ -110,55 +116,18 @@ export function useUnsavedChanges({
       e.preventDefault()
       e.stopPropagation()
 
-      pendingNavigationRef.current = href
-
-      if (onNavigateAway) {
-        onNavigateAway().then((shouldNavigate) => {
-          if (shouldNavigate && pendingNavigationRef.current) {
-            // Set leaving flag to disable guard
-            leavingRef.current = true
-            
-            // Clean up sentinel if present
-            if (sentinelPushedRef.current && history.state?.sentinel) {
-              sentinelPushedRef.current = false
-              history.back()
-              // Wait for back to complete before navigating
-              setTimeout(() => {
-                if (pendingNavigationRef.current) {
-                  router.push(pendingNavigationRef.current)
-                  pendingNavigationRef.current = null
-                }
-              }, 0)
-            } else {
-              router.push(pendingNavigationRef.current)
-              pendingNavigationRef.current = null
-            }
-          } else {
-            pendingNavigationRef.current = null
-          }
-        })
-      } else {
-        const shouldNavigate = window.confirm(message)
-        if (shouldNavigate && pendingNavigationRef.current) {
-          // Set leaving flag to disable guard
-          leavingRef.current = true
-          
-          // Clean up sentinel if present
-          if (sentinelPushedRef.current && history.state?.sentinel) {
-            sentinelPushedRef.current = false
-            history.back()
-            setTimeout(() => {
-              if (pendingNavigationRef.current) {
-                router.push(pendingNavigationRef.current)
-                pendingNavigationRef.current = null
-              }
-            }, 0)
-          } else {
-            router.push(pendingNavigationRef.current)
-            pendingNavigationRef.current = null
-          }
+      const shouldLeave = await handleLeave()
+      
+      if (shouldLeave) {
+        // Set leaving flag and navigate
+        leavingRef.current = true
+        sentinelPushedRef.current = false
+        
+        // If sentinel is on top, replace it; otherwise just navigate
+        if (history.state?.sentinel) {
+          router.replace(href)
         } else {
-          pendingNavigationRef.current = null
+          router.push(href)
         }
       }
     }
@@ -172,5 +141,5 @@ export function useUnsavedChanges({
       window.removeEventListener("popstate", handlePopState)
       document.removeEventListener("click", handleClick, { capture: true })
     }
-  }, [isDirty, message, pathname, router, onNavigateAway])
+  }, [isDirty, message, pathname, router, handleLeave])
 }

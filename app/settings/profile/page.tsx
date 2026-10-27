@@ -345,9 +345,9 @@ export default function ProfilePage() {
             <Button
               variant="outline"
               onClick={() => {
-                setShowUnsavedDialog(false)
                 const handler = (window as unknown as { __unsavedDialogHandler?: (discard: boolean) => void }).__unsavedDialogHandler
                 handler?.(false)
+                setShowUnsavedDialog(false)
               }}
             >
               Keep editing
@@ -355,10 +355,10 @@ export default function ProfilePage() {
             <Button
               variant="destructive"
               onClick={() => {
-                handleDiscard()
-                setShowUnsavedDialog(false)
                 const handler = (window as unknown as { __unsavedDialogHandler?: (discard: boolean) => void }).__unsavedDialogHandler
                 handler?.(true)
+                handleDiscard()
+                setShowUnsavedDialog(false)
               }}
             >
               Discard
