@@ -18,15 +18,15 @@ export function useUnsavedChanges({
   const router = useRouter()
   const pendingNavigationRef = useRef<string | null>(null)
   const sentinelPushedRef = useRef(false)
-  const isHandlingPopStateRef = useRef(false)
+  const leavingRef = useRef(false)
 
   // Push sentinel when becoming dirty, remove when clean
   useEffect(() => {
-    if (isDirty && !sentinelPushedRef.current) {
+    if (isDirty && !sentinelPushedRef.current && !leavingRef.current) {
       // Push sentinel history entry to intercept Back
       history.pushState({ sentinel: true }, "", window.location.href)
       sentinelPushedRef.current = true
-    } else if (!isDirty && sentinelPushedRef.current) {
+    } else if (!isDirty && sentinelPushedRef.current && !leavingRef.current) {
       // Clean up sentinel when form becomes clean
       if (history.state?.sentinel) {
         history.back()
@@ -37,41 +37,39 @@ export function useUnsavedChanges({
 
   useEffect(() => {
     // Handle browser back/forward
-    const handlePopState = (e: PopStateEvent) => {
-      if (!isDirty) {
+    const handlePopState = () => {
+      // Skip if we're in the process of leaving
+      if (leavingRef.current || !isDirty) {
         sentinelPushedRef.current = false
         return
       }
-
-      // Prevent infinite loop
-      if (isHandlingPopStateRef.current) return
-      isHandlingPopStateRef.current = true
 
       // Re-push sentinel to stay on current page
       history.pushState({ sentinel: true }, "", window.location.href)
 
       if (onNavigateAway) {
         onNavigateAway().then((shouldNavigate) => {
-          isHandlingPopStateRef.current = false
           if (shouldNavigate) {
-            // Clean up and navigate back
+            // Set leaving flag and navigate back
+            leavingRef.current = true
             sentinelPushedRef.current = false
-            history.back()
+            // Go back 2 steps: the sentinel we just pushed + the real back step
+            history.go(-2)
           }
         })
       } else {
         const shouldNavigate = window.confirm(message)
-        isHandlingPopStateRef.current = false
         if (shouldNavigate) {
+          leavingRef.current = true
           sentinelPushedRef.current = false
-          history.back()
+          history.go(-2)
         }
       }
     }
 
     // Handle beforeunload (page close/reload)
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isDirty) return
+      if (leavingRef.current || !isDirty) return
       e.preventDefault()
       e.returnValue = message
       return message
@@ -79,7 +77,7 @@ export function useUnsavedChanges({
 
     // Handle in-app navigation via links
     const handleClick = (e: MouseEvent) => {
-      if (!isDirty) return
+      if (leavingRef.current || !isDirty) return
 
       const target = e.target as HTMLElement
       const anchor = target.closest("a")
@@ -117,11 +115,14 @@ export function useUnsavedChanges({
       if (onNavigateAway) {
         onNavigateAway().then((shouldNavigate) => {
           if (shouldNavigate && pendingNavigationRef.current) {
-            // Clean up sentinel before navigating
+            // Set leaving flag to disable guard
+            leavingRef.current = true
+            
+            // Clean up sentinel if present
             if (sentinelPushedRef.current && history.state?.sentinel) {
-              history.back()
               sentinelPushedRef.current = false
-              // Wait for back to complete before pushing new route
+              history.back()
+              // Wait for back to complete before navigating
               setTimeout(() => {
                 if (pendingNavigationRef.current) {
                   router.push(pendingNavigationRef.current)
@@ -139,10 +140,13 @@ export function useUnsavedChanges({
       } else {
         const shouldNavigate = window.confirm(message)
         if (shouldNavigate && pendingNavigationRef.current) {
-          // Clean up sentinel before navigating
+          // Set leaving flag to disable guard
+          leavingRef.current = true
+          
+          // Clean up sentinel if present
           if (sentinelPushedRef.current && history.state?.sentinel) {
-            history.back()
             sentinelPushedRef.current = false
+            history.back()
             setTimeout(() => {
               if (pendingNavigationRef.current) {
                 router.push(pendingNavigationRef.current)
