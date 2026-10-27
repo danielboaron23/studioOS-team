@@ -352,6 +352,7 @@ export default function WorkspacePage() {
                         type="button"
                         onClick={() => removeInviteChip(index)}
                         className="hover:bg-background/50 rounded"
+                        aria-label={`Remove ${chip.email}`}
                       >
                         <X className="size-3" />
                       </button>

@@ -10,19 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Field } from "@/components/settings/field"
 import { useAppearanceSettings, updateAppearanceSettings, type Density } from "@/lib/settings-store"
-import { setTheme, type Theme } from "@/lib/theme"
+import { setTheme, useTheme, type Theme } from "@/lib/theme"
 import { toast } from "sonner"
 
 export default function AppearancePage() {
   const savedAppearance = useAppearanceSettings()
+  const { theme } = useTheme()
   const [isLoading, setIsLoading] = useState(true)
-  const [localTheme, setLocalTheme] = useState<Theme>("system")
   const [density, setDensity] = useState<Density>("comfortable")
   const [reducedMotion, setReducedMotion] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLocalTheme(savedAppearance.theme)
       setDensity(savedAppearance.density)
       setReducedMotion(savedAppearance.reducedMotion)
       setIsLoading(false)
@@ -31,7 +30,6 @@ export default function AppearancePage() {
   }, [savedAppearance])
 
   const handleThemeChange = (value: Theme) => {
-    setLocalTheme(value)
     setTheme(value)
     updateAppearanceSettings({ theme: value })
     toast.success("Settings saved")
@@ -50,8 +48,8 @@ export default function AppearancePage() {
   }
 
   const getThemeDisplay = () => {
-    if (localTheme === "system") return "System"
-    return localTheme === "light" ? "Light" : "Dark"
+    if (theme === "system") return "System"
+    return theme === "light" ? "Light" : "Dark"
   }
 
   if (isLoading) {
@@ -94,7 +92,7 @@ export default function AppearancePage() {
 
       <div className="space-y-6">
         <Field label="Theme">
-          <RadioGroup value={localTheme} onValueChange={(v) => handleThemeChange(v as Theme)}>
+          <RadioGroup value={theme} onValueChange={(v) => handleThemeChange(v as Theme)}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="system" id="theme-system" />
               <Label htmlFor="theme-system" className="font-normal cursor-pointer">

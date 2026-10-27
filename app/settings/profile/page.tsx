@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import { Field } from "@/components/settings/field"
 import { SaveBar } from "@/components/settings/save-bar"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -282,14 +283,11 @@ export default function ProfilePage() {
 
           <Field
             label={
-              <span>
-                Email
-                <Badge variant="secondary" className="ml-2">
-                  Verified
-                </Badge>
-              </span>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Badge variant="secondary">Verified</Badge>
+              </div>
             }
-            htmlFor="email"
             description="Ask your workspace owner to change your email."
           >
             <Input

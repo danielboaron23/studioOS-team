@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { useTheme, setTheme as setGlobalTheme } from "@/lib/theme"
-import { useProfileSettings } from "@/lib/settings-store"
+import { useTheme, setTheme as setGlobalTheme, type Theme } from "@/lib/theme"
+import { useProfileSettings, updateAppearanceSettings } from "@/lib/settings-store"
 
 function getInitials(name: string) {
   return name
@@ -29,10 +29,10 @@ function ThemeToggle() {
   }, [])
 
   function toggle() {
-    const next = theme === "system" 
-      ? (resolvedTheme === "light" ? "dark" : "light")
-      : (theme === "light" ? "dark" : "light")
-    setGlobalTheme(next)
+    // Toggle based on the current resolved theme
+    const nextTheme: Theme = resolvedTheme === "light" ? "dark" : "light"
+    setGlobalTheme(nextTheme)
+    updateAppearanceSettings({ theme: nextTheme })
   }
 
   if (!mounted) {

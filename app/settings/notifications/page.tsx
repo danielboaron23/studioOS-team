@@ -168,7 +168,7 @@ export default function NotificationsPage() {
           </Field>
 
           <div>
-            <div className="grid grid-cols-[1fr,auto,auto] gap-4 mb-2">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 mb-2">
               <div className="text-sm font-medium">Category</div>
               <div className="text-sm font-medium text-center w-20">In-app</div>
               <div className="text-sm font-medium text-center w-20">Email</div>
@@ -177,11 +177,12 @@ export default function NotificationsPage() {
               {categories.map((cat) => (
                 <div
                   key={cat.id}
-                  className="grid grid-cols-[1fr,auto,auto] gap-4 items-center"
+                  className="grid grid-cols-[1fr_auto_auto] gap-4 items-center"
                 >
                   <div className="text-sm">{cat.label}</div>
                   <div className="flex justify-center w-20">
                     <Checkbox
+                      aria-label={`${cat.label} in-app`}
                       checked={categorySettings[cat.id].inApp}
                       disabled={!inApp}
                       onCheckedChange={(checked) =>
@@ -191,6 +192,7 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex justify-center w-20">
                     <Checkbox
+                      aria-label={`${cat.label} email`}
                       checked={categorySettings[cat.id].email}
                       disabled={!email}
                       onCheckedChange={(checked) =>

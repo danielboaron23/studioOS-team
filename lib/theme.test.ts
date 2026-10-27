@@ -137,4 +137,38 @@ describe("theme", () => {
       expect(document.documentElement.classList.contains("dark")).toBe(true)
     })
   })
+
+  describe("Theme toggling", () => {
+    it("should toggle from light to dark", () => {
+      setTheme("light")
+      expect(localStorage.getItem("theme")).toBe("light")
+      
+      setTheme("dark")
+      expect(localStorage.getItem("theme")).toBe("dark")
+      expect(document.documentElement.classList.contains("dark")).toBe(true)
+    })
+
+    it("should toggle from dark to light", () => {
+      setTheme("dark")
+      expect(localStorage.getItem("theme")).toBe("dark")
+      
+      setTheme("light")
+      expect(localStorage.getItem("theme")).toBe("light")
+      expect(document.documentElement.classList.contains("dark")).toBe(false)
+    })
+
+    it("should change from system to explicit theme", () => {
+      global.window = {
+        matchMedia: vi.fn(() => createMatchMediaMock(true)),
+      } as unknown as typeof globalThis.window
+      
+      setTheme("system")
+      expect(localStorage.getItem("theme")).toBe("system")
+      expect(document.documentElement.classList.contains("dark")).toBe(true)
+      
+      setTheme("light")
+      expect(localStorage.getItem("theme")).toBe("light")
+      expect(document.documentElement.classList.contains("dark")).toBe(false)
+    })
+  })
 })
