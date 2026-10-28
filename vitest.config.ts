@@ -14,6 +14,17 @@ const dirname =
 export default defineConfig({
   test: {
     projects: [
+      // Unit tests project (node environment with in-test stubs)
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['**/*.test.ts', '**/*.test.tsx'],
+          exclude: ['node_modules', 'out', 'build', '.next', '**/*.stories.*'],
+          environment: 'node',
+        },
+      },
+      // Storybook tests project (browser)
       {
         extends: true,
         plugins: [

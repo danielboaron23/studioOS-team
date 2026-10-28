@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { Moon, Sun, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-
-const userName = "Hani Buskila"
+import { useTheme, setTheme as setGlobalTheme, type Theme } from "@/lib/theme"
+import { useProfileSettings, updateAppearanceSettings } from "@/lib/settings-store"
 
 function getInitials(name: string) {
   return name
@@ -21,25 +21,18 @@ function getInitials(name: string) {
 
 function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
-  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const { theme, resolvedTheme } = useTheme()
 
   useEffect(() => {
-    const stored = localStorage.getItem("theme")
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    const initial = stored === "dark" || (!stored && prefersDark) ? "dark" : "light"
-    // localStorage/matchMedia are unavailable during SSR, so the real theme can
-    // only be read after mount; the mounted-guard avoids a hydration mismatch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTheme(initial)
-    document.documentElement.classList.toggle("dark", initial === "dark")
     setMounted(true)
   }, [])
 
   function toggle() {
-    const next = theme === "light" ? "dark" : "light"
-    setTheme(next)
-    localStorage.setItem("theme", next)
-    document.documentElement.classList.toggle("dark", next === "dark")
+    // Toggle based on the current resolved theme
+    const nextTheme: Theme = resolvedTheme === "light" ? "dark" : "light"
+    setGlobalTheme(nextTheme)
+    updateAppearanceSettings({ theme: nextTheme })
   }
 
   if (!mounted) {
@@ -53,13 +46,21 @@ function ThemeToggle() {
 
   return (
     <Button variant="ghost" size="icon" onClick={toggle}>
-      {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
+      {resolvedTheme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
       <span className="sr-only">Toggle theme</span>
     </Button>
   )
 }
 
 export function Header() {
+  const [mounted, setMounted] = useState(false)
+  const profile = useProfileSettings()
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true)
+  }, [])
+  
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger className="-ml-1" />
@@ -74,15 +75,31 @@ export function Header() {
       <ThemeToggle />
 
       <div className="flex items-center gap-2">
-        <div className="hidden sm:flex flex-col items-end leading-tight">
-          <span className="text-sm font-medium">{userName}</span>
-          <span className="text-xs text-muted-foreground">Product Designer</span>
-        </div>
-        <Avatar size="sm">
-          <AvatarFallback className="bg-[#3b82f5] text-white font-bold">
-            {getInitials(userName)}
-          </AvatarFallback>
-        </Avatar>
+        {mounted && (
+          <>
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <span className="text-sm font-medium">{profile.displayName}</span>
+              <span className="text-xs text-muted-foreground">{profile.role}</span>
+            </div>
+            <Avatar size="sm">
+              {profile.avatarDataUrl && (
+                <AvatarImage src={profile.avatarDataUrl} alt={profile.displayName} />
+              )}
+              <AvatarFallback className="bg-muted text-foreground font-bold">
+                {getInitials(profile.displayName)}
+              </AvatarFallback>
+            </Avatar>
+          </>
+        )}
+        {!mounted && (
+          <>
+            <div className="hidden sm:flex flex-col items-end leading-tight">
+              <div className="h-[1.25rem] w-24 bg-muted rounded animate-pulse" />
+              <div className="h-[1rem] w-32 bg-muted rounded animate-pulse mt-0.5" />
+            </div>
+            <div className="size-8 rounded-full bg-muted animate-pulse" />
+          </>
+        )}
       </div>
     </header>
   )
